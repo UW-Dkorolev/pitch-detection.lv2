@@ -2,6 +2,7 @@
 
 #include "pitch.hh"
 #include "musicalscale.hh"
+#include "smb-pitch-shift.hh"
 
 #include "lv2/lv2plug.in/ns/lv2core/lv2.h"
 
@@ -22,6 +23,7 @@ typedef struct {
 	float*        output;
 	Analyzer*     analyzer;
 	MusicalScale* ms;
+	double        rate;
 	// Outputs
 	float* detected;
 	float* difference;
@@ -37,6 +39,7 @@ instantiate(const LV2_Descriptor*     descriptor,
 	Detection* d = new Detection();
 	d->analyzer = new Analyzer(rate, "test");
 	d->ms = new MusicalScale();
+	d->rate = rate;
 
 	return (LV2_Handle)d;
 }
@@ -88,15 +91,19 @@ static void run(LV2_Handle instance, uint32_t n_samples) {
 		*d->difference = float(difference);
 		*d->frequency = float(frequency);
 		*d->note = float(note);
+
+		// do the pitch shifting
+		float shift = powf(2, *d->difference/12);
+		smbPitchShift(shift, n_samples, 2048, 4, d->rate, input, output);
 	} else {
 		*d->detected = 0.0;
 		*d->difference = 0.0;
 		*d->frequency = 0.0;
 		*d->note = 0.0;
-	}
-
-	for (uint32_t pos = 0; pos < n_samples; pos++) {
-		output[pos] = input[pos]; // simple copy
+		// copy the input
+		for (uint32_t pos = 0; pos < n_samples; pos++) {
+			output[pos] = input[pos]; // simple copy
+		}
 	}
 }
 
